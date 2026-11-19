@@ -1,0 +1,137 @@
+
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OLITEF | IF Goiano - Campus Cristalina</title>
+<style>
+:root{--verde:#176b52;--fundo:#f4f7f6;--texto:#18332b}
+body{font-family:Arial,sans-serif;background:var(--fundo);color:var(--texto);margin:0}
+header{background:var(--verde);color:white;padding:28px 5vw}
+main{max-width:1200px;margin:24px auto;padding:0 18px}
+.filtros,.painel,.kpi{background:white;border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 2px 10px #18332b12}
+.filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+label{font-size:13px;font-weight:bold;display:block;margin-bottom:6px}
+select{width:100%;padding:10px;border:1px solid #ccd8d3;border-radius:7px;background:white}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+nav button{border:0;padding:11px 15px;border-radius:7px;background:#dce9e4;cursor:pointer}
+nav button.ativo{background:var(--verde);color:white}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi small{color:#60766d}.valor{font-size:26px;font-weight:bold;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:10px;border-bottom:1px solid #e5ece8;text-align:left}
+th{background:#f0f5f2}.nota{color:#60766d;font-size:13px}
+.secao{display:none}.secao.ativa{display:block}
+.barras{height:14px;background:#e9efec;border-radius:10px;overflow:hidden;display:flex}
+.barras span{height:100%}.ouro{background:#d5a62e}.prata{background:#9aa7b1}.bronze{background:#a96c45}
+.grafico-colunas{display:flex;gap:12px;overflow-x:auto;padding:18px 8px 4px}
+.grupo-curso{flex:1;min-width:210px;border-left:1px solid #e5ece8;padding:0 10px}
+.grupo-curso:first-child{border-left:0}.grupo-curso h3{text-align:center;font-size:14px;margin:0 0 12px}
+.colunas{height:230px;display:flex;align-items:flex-end;justify-content:space-around;gap:8px;border-bottom:1px solid #9aaba3}
+.coluna-item{height:100%;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:42px}
+.coluna{width:min(42px,80%);background:#3b8b70;border-radius:5px 5px 0 0;min-height:2px}
+.valor-coluna{font-size:11px;margin-bottom:4px}.rotulo-coluna{font-size:11px;margin-top:7px;white-space:nowrap}
+@media(max-width:600px){header{padding:22px}table{font-size:12px}.grupo-curso{min-width:190px}}
+</style></head><body>
+<header><h1>OLITEF | Resultados</h1><div>IF Goiano – Campus Cristalina</div></header>
+<main>
+<section class="filtros">
+<div><label for="ano">Edição</label><select id="ano"></select></div>
+<div><label for="curso">Curso</label><select id="curso"><option value="">Todos os cursos</option></select></div>
+<div><label for="turma">Turma</label><select id="turma"><option value="">Todas as turmas</option></select></div>
+<div><label for="serie">Série</label><select id="serie"><option value="">Todas as séries</option></select></div>
+</section>
+<nav>
+<button class="ativo" data-tab="geral">Visão geral</button>
+<button data-tab="desempenho">Desempenho</button>
+<button data-tab="medalhas">Medalhas e cortes</button>
+<button data-tab="evolucao">Evolução anual</button>
+</nav>
+<section id="geral" class="secao ativa">
+<div class="kpis" id="kpis"></div>
+<div class="painel"><h2>Distribuição de medalhas</h2><div id="medalhas-barra" class="barras"></div><p id="medalhas-legenda" class="nota"></p></div>
+
+</section>
+<section id="desempenho" class="secao"><div class="painel"><h2>Desempenho por agrupamento</h2><div id="tabela-desempenho"></div></div></section>
+<section id="medalhas" class="secao">
+<div class="painel"><h2>Notas de corte da edição</h2><div id="cortes"></div></div>
+<div class="painel"><h2>Quantidade por medalha</h2><div id="tabela-medalhas"></div></div>
+</section>
+<section id="evolucao" class="secao">
+<div class="painel"><h2>Média das notas por curso e série</h2><p class="nota" id="grafico-subtitulo"></p><div id="grafico-medias" class="grafico-colunas"></div></div>
+<div class="painel"><h2>Comparação entre edições</h2><p class="nota" id="comparacao-subtitulo"></p><div id="comparacao"></div></div>
+</section>
+<p class="nota" id="rodape"></p>
+</main>
+<script>
+let D;
+const $=id=>document.getElementById(id);
+const fmt=x=>x==null||!Number.isFinite(Number(x))?"—":Number(x).toLocaleString("pt-BR",{maximumFractionDigits:2});
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const seriesOrdem=["1º ano EM","2º ano EM","3º ano EM"];
+const cursosOrdem=["Agronegócio","Agropecuária","Informática"];
+function selectFill(id,vals,all){const el=$(id),old=el.value;el.innerHTML=(all?`<option value="">${all}</option>`:"")+vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");if(vals.includes(old))el.value=old;}
+function serieDaTurma(t){
+ const final = String(t || "").slice(-1);
+ if(final === "1") return "1º ano EM";
+ if(final === "2") return "2º ano EM";
+ if(final === "3") return "3º ano EM";
+ return "";
+}
+
+function atualizarTurmas(){
+ const curso = $("curso").value;
+ const serie = $("serie").value;
+
+ // Relação fechada: cada curso aceita somente estas três turmas.
+ const turmasPorCurso = {
+   "Agronegócio": ["TAGN1", "TAGN2", "TAGN3"],
+   "Agropecuária": ["TAG1", "TAG2", "TAG3"],
+   "Informática": ["INFO1", "INFO2", "INFO3"]
+ };
+
+ // Sem curso selecionado, exibe todas as turmas existentes.
+ // Com curso selecionado, usa exclusivamente a lista correspondente.
+ const turmasPermitidas = curso
+   ? (turmasPorCurso[curso] || [])
+   : D.turmas;
+
+ // Mantém apenas turmas que realmente existem nos dados do ano.
+ let turmas = turmasPermitidas.filter(t => D.turmas.includes(t));
+
+ // Se houver série selecionada, restringe as opções a essa série.
+ if(serie){
+   turmas = turmas.filter(t => serieDaTurma(t) === serie);
+ }
+
+ selectFill("turma", turmas, "Todas as turmas");
+}
+
+function atualizarSeriesPelaTurma(){
+ const turma = $("turma").value;
+
+ if(!turma) return;
+
+ const serieCorrespondente = serieDaTurma(turma);
+
+ if(serieCorrespondente){
+   $("serie").value = serieCorrespondente;
+ }
+}
+function selectedDims(){return ["curso","turma","serie"].filter(k=>$(k).value!=="");}
+function filteredRows(y,dims){const g=dims.join("|");return D.cubo.filter(r=>Number(r.ano)===Number(y)&&r.grupo===g&&dims.every(k=>String(r[k])===String($(k).value)));}
+function getRow(y){const d=selectedDims(),r=filteredRows(y,d);return r.length?r[0]:null;}
+function tableStats(r){if(!r||r.n==null)return "<p>Não há dados suficientes para este recorte ou o grupo foi suprimido por privacidade.</p>";return `<table><tr><th>Participantes</th><th>Média</th><th>Mediana</th><th>Moda</th><th>Maior</th><th>Menor</th></tr><tr><td>${fmt(r.n)}</td><td>${fmt(r.media)}</td><td>${fmt(r.mediana)}</td><td>${esc(r.moda)}</td><td>${fmt(r.maxima)}</td><td>${fmt(r.minima)}</td></tr></table>`;}
+function renderGrafico(){const ano=Number($("ano").value),turma=$("turma").value,serie=$("serie").value;const curso=$("curso").value||(turma.startsWith("INFO")?"Informática":turma.startsWith("TAGN")?"Agronegócio":turma.startsWith("TAG")?"Agropecuária":"");const gs=D.cubo.filter(r=>Number(r.ano)===ano&&r.grupo==="curso|serie"&&(!curso||r.curso===curso)&&(!serie||r.serie===serie));const cs=curso?[curso]:cursosOrdem;$("grafico-subtitulo").textContent=`Médias da edição ${ano}; somente participantes com nota maior que zero.`;$("grafico-medias").innerHTML=cs.map(c=>{const cols=seriesOrdem.map(s=>{if(serie&&serie!==s)return "";if(turma&&serieDaTurma(turma)!==s)return "";const r=gs.find(x=>x.curso===c&&x.serie===s);if(!r||r.media==null)return `<div class="coluna-item"><div class="valor-coluna">—</div><div class="coluna" style="height:2px"></div><div class="rotulo-coluna">${s.replace("º ano EM","º ano")}</div></div>`;const h=Math.max(2,100*Number(r.media)/100);return `<div class="coluna-item"><div class="valor-coluna">${fmt(r.media)}</div><div class="coluna" style="height:${h}%"></div><div class="rotulo-coluna">${s.replace("º ano EM","º ano")}</div></div>`;}).join("");return `<div class="grupo-curso"><h3>${esc(c)}</h3><div class="colunas">${cols}</div></div>`;}).join("");}
+function renderComparacao(){const ys=D.anos.map(Number).sort((a,b)=>a-b);if(ys.length<2){$("comparacao").innerHTML="<p>Adicione pelo menos duas edições para visualizar a evolução.</p>";return;}const aYear=ys[ys.length-2],bYear=ys[ys.length-1],c=$("curso").value,t=$("turma").value,s=$("serie").value;const atual=D.cubo.filter(r=>Number(r.ano)===bYear&&r.grupo==="curso|turma|serie"&&(!c||r.curso===c)&&(!t||r.turma===t)&&(!s||r.serie===s));const anterior=D.cubo.filter(r=>Number(r.ano)===aYear&&r.grupo==="curso|turma|serie");$("comparacao-subtitulo").textContent=`Comparação entre ${aYear} e ${bYear}. Os filtros definem os grupos apresentados. Não há comparação individual de estudantes.`;if(!atual.length){$("comparacao").innerHTML="<p>Não há grupos disponíveis para os filtros selecionados.</p>";return;}const ms=[["n","Participantes"],["media","Média"],["mediana","Mediana"],["moda","Moda"],["maxima","Maior nota"],["minima","Menor nota"]];$("comparacao").innerHTML=atual.map(b=>{const a=anterior.find(x=>x.curso===b.curso&&x.turma===b.turma&&x.serie===b.serie);return `<h3>${esc(b.curso)} — ${esc(b.turma)} — ${esc(b.serie)}</h3><table><tr><th>Indicador</th><th>${aYear}</th><th>${bYear}</th><th>Diferença</th></tr>${ms.map(([k,l])=>`<tr><td>${l}</td><td>${fmt(a?.[k])}</td><td>${fmt(b[k])}</td><td>${k==="moda"?"—":fmt(Number(b[k])-Number(a?.[k]))}</td></tr>`).join("")}</table>`;}).join("");}
+function render(){const y=Number($("ano").value),r=getRow(y);$("kpis").innerHTML=[["Participantes",r?.n],["Média",r?.media],["Mediana",r?.mediana],["Maior nota",r?.maxima],["Menor nota",r?.minima]].map(([a,b])=>`<div class="kpi"><small>${a}</small><div class="valor">${fmt(b)}</div></div>`).join("");const n=Number(r?.n||0),o=Number(r?.ouro||0),p=Number(r?.prata||0),b=Number(r?.bronze||0);$("medalhas-barra").innerHTML=n?`<span class="ouro" style="width:${100*o/n}%"></span><span class="prata" style="width:${100*p/n}%"></span><span class="bronze" style="width:${100*b/n}%"></span>`:"";$("medalhas-legenda").textContent=`Ouro: ${fmt(r?.ouro)} | Prata: ${fmt(r?.prata)} | Bronze: ${fmt(r?.bronze)} | Sem medalha: ${fmt(r?.sem_medalha)}`;$("tabela-desempenho").innerHTML=tableStats(r);const corte=D.cortes.find(x=>Number(x.ano)===y);$("cortes").innerHTML=corte?`<table><tr><th>Ouro</th><th>Prata</th><th>Bronze</th></tr><tr><td>${fmt(corte.ouro)}</td><td>${fmt(corte.prata)}</td><td>${fmt(corte.bronze)}</td></tr></table>`:"Cortes não encontrados.";$("tabela-medalhas").innerHTML=r?`<table><tr><th>Categoria</th><th>Estudantes</th><th>% dos participantes</th></tr>${[["Ouro",r.ouro],["Prata",r.prata],["Bronze",r.bronze],["Sem medalha",r.sem_medalha]].map(([n,v])=>`<tr><td>${n}</td><td>${fmt(v)}</td><td>${r.n?fmt(100*v/r.n)+"%":"—"}</td></tr>`).join("")}</table>`:"Sem dados.";renderGrafico();renderComparacao();}
+document.querySelectorAll("nav button").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("ativo",x===btn));document.querySelectorAll(".secao").forEach(x=>x.classList.toggle("ativa",x.id===btn.dataset.tab));}));
+$("ano").addEventListener("change",render);
+$("curso").addEventListener("change",()=>{$("turma").value="";$("serie").value="";atualizarTurmas();render();});
+$("turma").addEventListener("change",()=>{
+ atualizarSeriesPelaTurma();
+ atualizarTurmas();
+ render();
+});
+$("serie").addEventListener("change",()=>{const t=$("turma").value;if(t&&serieDaTurma(t)!==$("serie").value)$("turma").value="";atualizarTurmas();render();});
+fetch("dados_dashboard.json").then(r=>{if(!r.ok)throw Error("Falha ao carregar dados_dashboard.json");return r.json();}).then(d=>{D=d;selectFill("ano",D.anos.map(String));$("ano").value=String(Math.max(...D.anos.map(Number)));selectFill("curso",D.cursos,"Todos os cursos");selectFill("serie",D.series,"Todas as séries");atualizarTurmas();$("rodape").textContent="Dados atualizados em "+D.atualizado_em+". Resultados agregados; notas iguais a zero não entram nas estatísticas. Painel construído por Profª. Msc. Yasmine da Mata Mendonça. Contato:yasmine.mendonca@ifgoiano.edu.br @yasmine.damata";render();}).catch(e=>{document.querySelector("main").insertAdjacentHTML("afterbegin",`<p style="color:#a00">Erro: ${esc(e.message)}. Verifique se dados_dashboard.json está na mesma pasta de index.html.</p>`);});
+</script></body></html>
+
